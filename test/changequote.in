@@ -1,0 +1,4 @@
+`foo'
+changequote(!,|)
+`foo'
+!foo|
