@@ -6,10 +6,97 @@ import subprocess
 import unittest
 from StringIO import StringIO
 
-from m4 import Lexer, Parser
+from m4 import (
+    Lexer,
+    Parser,
+    EOF,
+)
 
 class LexerTests(unittest.TestCase):
-    pass
+    def lex(self, text):
+        return list(Lexer(text).parse())
+
+    def test_basic(self):
+        tokens = self.lex('abc xy_z _foo')
+        self.assertEqual(tokens,
+                         ['abc', ' ', 'xy_z', ' ', '_foo'])
+        self.assertEqual(tokens[0].type, 'IDENTIFIER')
+        self.assertEqual(tokens[0].value, 'abc')
+        self.assertEqual(tokens[1], ' ')
+        self.assertTrue(isinstance(tokens[1], basestring))
+        self.assertEqual(self.lex('_abc123 123'),
+                         ['_abc123', ' ', '1', '2', '3'])
+
+        tokens = self.lex('1abc')
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0], '1')
+        self.assertEqual(tokens[1].type, 'IDENTIFIER')
+        self.assertEqual(tokens[1].value, 'abc')
+
+        text = '([{}])=+-,.?/|\n'
+        self.assertEqual(self.lex(text), list(text))
+
+
+    def test_strings(self):
+        tokens = self.lex("`abc'")
+        self.assertEqual(len(tokens), 1)
+        self.assertEqual(tokens[0].type, 'STRING')
+        self.assertEqual(tokens[0].value, 'abc')
+
+        tokens = self.lex("foo`abc'foo")
+        self.assertEqual(len(tokens), 3)
+        self.assertEqual(tokens[0].type, 'IDENTIFIER')
+        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[1].type, 'STRING')
+        self.assertEqual(tokens[1].value, 'abc')
+        self.assertEqual(tokens[2].type, 'IDENTIFIER')
+        self.assertEqual(tokens[2].value, 'foo')
+
+        tokens = self.lex("`foo' `foo'")
+        self.assertEqual(len(tokens), 3)
+        self.assertEqual(tokens[0].type, 'STRING')
+        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[1], ' ')
+        self.assertEqual(tokens[2].type, 'STRING')
+        self.assertEqual(tokens[2].value, 'foo')
+
+        tokens = self.lex("`foo'`foo'")
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, 'STRING')
+        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[1].type, 'STRING')
+        self.assertEqual(tokens[1].value, 'foo')
+
+    def test_comments(self):
+        tokens = self.lex("# foo")
+        self.assertEqual(len(tokens), 1)
+        self.assertEqual(tokens[0].type, 'COMMENT')
+        self.assertEqual(tokens[0].value, '# foo')
+
+        tokens = self.lex("foo # foo")
+        self.assertEqual(len(tokens), 3)
+        self.assertEqual(tokens[0].type, 'IDENTIFIER')
+        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[1], ' ')
+        self.assertEqual(tokens[2].type, 'COMMENT')
+        self.assertEqual(tokens[2].value, '# foo')
+
+        tokens = self.lex("foo#foo")
+        self.assertEqual(len(tokens), 2)
+        self.assertEqual(tokens[0].type, 'IDENTIFIER')
+        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[1].type, 'COMMENT')
+        self.assertEqual(tokens[1].value, '#foo')
+
+        tokens = self.lex("foo#foo\nfoo")
+        self.assertEqual(len(tokens), 4)
+        self.assertEqual(tokens[0].type, 'IDENTIFIER')
+        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[1].type, 'COMMENT')
+        self.assertEqual(tokens[1].value, '#foo')
+        self.assertEqual(tokens[2], '\n')
+        self.assertEqual(tokens[3].type, 'IDENTIFIER')
+        self.assertEqual(tokens[3].value, 'foo')
 
 class ParserTests(unittest.TestCase):
     pass

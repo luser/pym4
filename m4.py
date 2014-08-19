@@ -14,6 +14,13 @@ class Token(object):
         self.lexpos = lexpos
         self.lineno = lineno
 
+    def __eq__(self, other):
+        if isinstance(other, Token):
+            return self.type == other.type and self.value == other.value
+        elif isinstance(other, basestring):
+            return self.value == other
+        return False
+
     def __repr__(self):
         return "<Token: %r %r>" % (self.type, self.value)
 
@@ -31,13 +38,6 @@ def rmend(l, e):
 def name(x):
     return x.__name__ if hasattr(x, '__name__') else x
 
-keywords = {
-    '(': 'LPAREN',
-    ')': 'RPAREN',
-    ',': 'COMMA',
-    '\n': 'NEWLINE',
-}
-
 class Lexer:
     def __init__(self, text):
         self.text = text
@@ -49,7 +49,7 @@ class Lexer:
         self.end_quote = ["'"]
 
     def finish_token(self, name):
-        t = Token(name, ''.join(self.chars), self.lexpos, self.lineno) if self.chars else None
+        t = Token(name, ''.join(self.chars), self.lexpos, self.lineno)
         self.chars = []
         return t
 
@@ -59,67 +59,63 @@ class Lexer:
             if c == '\n':
                 self.lineno += 1
             #print 'CHAR: %s (state: %s)' % (repr(c), name(self.state))
-            tok, consumed = (None, False)
+            tokens, consumed = ([], False)
             while not consumed:
                 if self.state is not None:
-                    res = self.state(c)
+                    tokens, consumed = self.state(c)
                 else:
-                    res = self.generic(c)
-                if res:
-                    tok, consumed = res
-                    if tok is not None:
-                        yield tok
+                    tokens, consumed = self.generic(c)
+                for tok in tokens:
+                    yield tok
                 if c is EOF:
                     break
         if self.chars:
             if self.state is None:
-                yield self.finish_token('OTHER')
+                for c in self.chars:
+                    yield c
             else:
                 raise ParseError('Error, unterminated %s' % self.state)
 
     def generic(self, c):
-        t = None
-        if c in keywords:
-            return Token(keywords[c], c, self.lexpos, self.lineno), True
+        if c is not EOF:
+            self.chars.append(c)
         if c.isalpha() or c == '_':
-            t = self.finish_token('OTHER'), False
             self.state = self.identifier
         elif c == '#':
-            t = self.finish_token('OTHER'), False
             self.state = self.comment
-        else:
-            self.chars.append(c)
-            t = None, True
-        if endswith(self.chars, self.start_quote):
-            self.chars = rmend(self.chars, self.start_quote)
-            t = self.finish_token('OTHER'), True
+        # TODO: handle multi-character quotes
+        if self.chars == self.start_quote:
             self.state = self.string
-        return t
+        if self.state is None:
+             chars = self.chars
+             self.chars = []
+             return chars, True
+        return [], True
 
     def string(self, c):
         self.chars.append(c)
-        t = None
         if endswith(self.chars, self.end_quote):
-            self.chars = rmend(self.chars, self.end_quote)
+            # strip start/end quote out of the token value
+            self.chars = self.chars[len(self.start_quote):-len(self.end_quote)]
             self.state = None
-            t = self.finish_token('STRING')
-        return t, True
+            return [self.finish_token('STRING')], True
+        return [], True
 
     def identifier(self, c):
         if not (c.isalnum() or c == '_'):
             self.state = None
-            return self.finish_token('IDENTIFIER'), False
+            return [self.finish_token('IDENTIFIER')], False
 
         self.chars.append(c)
-        return None, True
+        return [], True
 
     def comment(self, c):
-        if c is not EOF:
+        if c != '\n' and c is not EOF:
             self.chars.append(c)
-        if c == '\n' or c == EOF:
-            self.state = None
-            return self.finish_token('COMMENT'), True
-        return None, True
+            return [], True
+
+        self.state = None
+        return [self.finish_token('COMMENT')], False
 
 class PLYCompatLexer(object):
     def __init__(self, text):
@@ -160,43 +156,67 @@ class peekiter:
             return self.EOF
         return self._next
 
+def substmacro(name, body, args):
+    # TODO: implement argument substitution
+    return body
+
 class Parser:
     def __init__(self, text):
         self.macros = {
             'define': self.define,
             'dnl': self.dnl,
+            # TODO: changequote
         }
         self.lexer = Lexer(text)
         self.token_iter = peekiter(self.lexer.parse())
 
     def define(self, args):
-        if len(args) >= 2:
-            self.macros[args[0]] = args[1]
+        if args:
+            name = args[0]
+            if len(args) >= 2:
+                body = args[1]
+            else:
+                body = ''
+            self.macros[name] = lambda x: substmacro(name, body, x)
+        return None
 
     def dnl(self, args):
         # Eat tokens till newline
         for tok in self.token_iter:
-            if tok.value == 'NEWLINE':
+            if tok == '\n':
                 break
+        return None
 
     def _parse_args(self):
         tok = self.token_iter.peek()
-        if tok is not peekiter.EOF and tok.value == 'LPAREN':
-            #TODO: parse args
-            return []
-        else:
-            return []
-
-    def parse(self, stream=sys.stdout, verbose=False):
-        for tok in self.token_iter:
-            if verbose:
-                print tok
-            else:
-                if tok.type == 'IDENTIFIER' and tok.value in self.macros:
-                    self.macros[tok.value](self._parse_args())
+        args = []
+        current_arg = []
+        if tok == '(':
+            # drop that token
+            self.token_iter.next()
+            for tok in self.expand_tokens():
+                if tok == ',' or tok == ')':
+                    args.append(''.join(current_arg))
+                    current_arg = []
                 else:
-                    stream.write(tok.value)
+                    current_arg.append(tok.value if isinstance(tok, Token) else tok)
+                if tok == ')':
+                    break
+        return args
+
+    def expand_tokens(self):
+        for tok in self.token_iter:
+            if isinstance(tok, Token) and tok.type == 'IDENTIFIER' and tok.value in self.macros:
+                result = self.macros[tok.value](self._parse_args())
+                if result:
+                    # TODO: push back
+                    pass
+            else:
+                yield tok
+
+    def parse(self, stream=sys.stdout):
+        for tok in self.expand_tokens():
+            stream.write(tok.value if isinstance(tok, Token) else tok)
 
 if __name__ == '__main__':
-    verbose = sys.argv[-1] == '-v'
-    Parser(sys.stdin.read()).parse(verbose=verbose)
+    Parser(sys.stdin.read()).parse()
