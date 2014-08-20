@@ -1,0 +1,1 @@
+This is a mostly-compatible implementation of M4 in Python. My intent is to write a parser capable of parsing Mozilla's configure.in file with an eye towards converting it away from autoconf.
