@@ -123,6 +123,32 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(tokens[1].type, 'STRING')
         self.assertEqual(tokens[1].value, 'foo')
 
+    def test_changequote(self):
+        lex = Lexer("`abc'`abc'[xyz]`abc'")
+        i = lex.parse()
+        token = i.next()
+        self.assertEqual(token.type, 'STRING')
+        self.assertEqual(token.value, 'abc')
+        lex.changequote('[', ']')
+        # changing the quote characters should make the default quote
+        # characters be treated as normal characters.
+        token = i.next()
+        self.assertEqual(token, '`')
+        token = i.next()
+        self.assertEqual(token.type, 'IDENTIFIER')
+        self.assertEqual(token.value, 'abc')
+        token = i.next()
+        self.assertEqual(token, '\'')
+        # ...and the new quote characters should work
+        token = i.next()
+        self.assertEqual(token.type, 'STRING')
+        self.assertEqual(token.value, 'xyz')
+        # check that the defaults work
+        lex.changequote()
+        token = i.next()
+        self.assertEqual(token.type, 'STRING')
+        self.assertEqual(token.value, 'abc')
+
     def test_comments(self):
         tokens = self.lex("# foo")
         self.assertEqual(len(tokens), 1)
@@ -228,6 +254,11 @@ class ParserTests(unittest.TestCase):
         p.define('abc', 'xyz')
         p.define('xyz', '123')
         self.assertEqual(self.parse(p), '123')
+
+    def test_changequote(self):
+        p = Parser("`abc'[xyz]")
+        p.changequote('[', ']')
+        self.assertEqual(self.parse(p), "`abc'xyz")
 
 
 class ComparisonTests(unittest.TestCase):

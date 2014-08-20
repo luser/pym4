@@ -96,6 +96,10 @@ class Lexer:
     def insert_text(self, text):
         self.iter.insert(text)
 
+    def changequote(self, start_quote='`', end_quote='\''):
+        self.start_quote = [start_quote]
+        self.end_quote = [end_quote]
+
     def parse(self):
         '''
         Return an iterator that produces tokens. The iterator
@@ -194,7 +198,7 @@ class Parser:
         self.macros = {
             'define': self._builtin_define,
             'dnl': self._builtin_dnl,
-            # TODO: changequote
+            'changequote': self._builtin_changequote,
         }
         self.lexer = Lexer(text)
         self.token_iter = self.lexer.parse()
@@ -209,6 +213,10 @@ class Parser:
         for tok in self.token_iter:
             if tok == '\n':
                 break
+        return None
+
+    def _builtin_changequote(self, args):
+        self.changequote(*args[:2])
         return None
 
     def _parse_args(self):
@@ -245,6 +253,9 @@ class Parser:
 
     def define(self, name, body=''):
         self.macros[name] = lambda x: substmacro(name, body, x)
+
+    def changequote(self, start_quote='`', end_quote='\''):
+        self.lexer.changequote(start_quote, end_quote)
 
     def parse(self, stream=sys.stdout):
         for tok in self._expand_tokens():

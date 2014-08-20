@@ -2,7 +2,3 @@
 changequote(!,|)
 `foo'
 !foo|
-changequote([[,]])
-foo[bar]foo
-[[foo]]
-foo[[bar]]foo
