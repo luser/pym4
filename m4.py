@@ -236,7 +236,7 @@ class Parser:
                 if tok.value == ',' or tok.value == ')':
                     args.append(''.join(current_arg))
                     current_arg = []
-                else:
+                elif current_arg or not tok.value.isspace():
                     current_arg.append(tok.value)
                 if tok.value == ')':
                     break
