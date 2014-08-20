@@ -179,12 +179,7 @@ class Parser:
 
     def _builtin_define(self, args):
         if args:
-            name = args[0]
-            if len(args) >= 2:
-                body = args[1]
-            else:
-                body = ''
-            self.macros[name] = lambda x: substmacro(name, body, x)
+            self.define(*args[:2])
         return None
 
     def _builtin_dnl(self, args):
@@ -220,10 +215,12 @@ class Parser:
             ):
                 result = self.macros[tok.value](self._parse_args())
                 if result:
-                    # TODO: push back
-                    pass
+                    self.lexer.insert_text(result)
             else:
                 yield tok
+
+    def define(self, name, body=''):
+        self.macros[name] = lambda x: substmacro(name, body, x)
 
     def parse(self, stream=sys.stdout):
         for tok in self._expand_tokens():

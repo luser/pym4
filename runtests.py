@@ -168,7 +168,26 @@ class LexerTests(unittest.TestCase):
 
 
 class ParserTests(unittest.TestCase):
-    pass
+    def parse(self, parser):
+        stream = StringIO()
+        parser.parse(stream=stream)
+        return stream.getvalue()
+
+    def test_define_empty(self):
+        p = Parser('abc')
+        p.define('abc')
+        self.assertEqual(self.parse(p), '')
+
+    def test_define_simple(self):
+        p = Parser('abc')
+        p.define('abc', 'xyz')
+        self.assertEqual(self.parse(p), 'xyz')
+
+    def test_define_recursive(self):
+        p = Parser('abc')
+        p.define('abc', 'xyz')
+        p.define('xyz', '123')
+        self.assertEqual(self.parse(p), '123')
 
 
 class ComparisonTests(unittest.TestCase):
