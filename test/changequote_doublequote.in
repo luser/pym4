@@ -1,3 +1,4 @@
+dnl fail
 changequote([[,]])
 foo[bar]foo
 [[foo]]

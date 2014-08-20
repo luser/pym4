@@ -293,8 +293,11 @@ class ComparisonTests(unittest.TestCase):
 
 
 def create_test(input_file, output_file, thing):
+    first_line = open(input_file, 'r').readline()
     def do_test(self):
         self.check_file(input_file, output_file, thing)
+    if first_line.startswith('dnl fail') and thing == 'parser':
+        return unittest.expectedFailure(do_test)
     return do_test
 
 
