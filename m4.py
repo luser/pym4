@@ -84,6 +84,7 @@ class Lexer:
         self.text = text
         self.state = None
         self.chars = []
+        self.nesting_level = 0
         self.start_quote = ['`']
         self.end_quote = ["'"]
         self.iter = None
@@ -152,6 +153,7 @@ class Lexer:
         # TODO: handle multi-character quotes
         if self.chars == self.start_quote:
             self.state = self._string
+            self.nesting_level = 1
         if self.state is None:
             chars = self.chars
             self.chars = []
@@ -160,11 +162,19 @@ class Lexer:
 
     def _string(self, c):
         self.chars.append(self.iter.next())
-        if endswith(self.chars, self.end_quote):
-            # strip start/end quote out of the token value
-            self.chars = self.chars[len(self.start_quote):-len(self.end_quote)]
-            self.state = None
-            return [self._finish_token('STRING')]
+        if (
+                self.start_quote != self.end_quote and
+                endswith(self.chars, self.start_quote)
+        ):
+            self.nesting_level += 1
+        elif endswith(self.chars, self.end_quote):
+            self.nesting_level -= 1
+            if self.nesting_level == 0:
+                # strip start/end quote out of the token value
+                self.chars = \
+                    self.chars[len(self.start_quote):-len(self.end_quote)]
+                self.state = None
+                return [self._finish_token('STRING')]
         return []
 
     def _identifier(self, c):

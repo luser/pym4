@@ -123,6 +123,12 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(tokens[1].type, 'STRING')
         self.assertEqual(tokens[1].value, 'foo')
 
+    def test_nested_quotes(self):
+        tokens = self.lex("`abc `xyz' abc'")
+        self.assertEqual(len(tokens), 1)
+        self.assertEqual(tokens[0].type, 'STRING')
+        self.assertEqual(tokens[0].value, "abc `xyz' abc")
+
     def test_changequote(self):
         lex = Lexer("`abc'`abc'[xyz]`abc'")
         i = lex.parse()

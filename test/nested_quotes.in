@@ -1,0 +1,3 @@
+`foo `foo' bar'
+changequote([,])
+[foo [foo] bar]
