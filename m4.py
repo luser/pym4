@@ -13,15 +13,13 @@ class ParseError(Exception):
 
 
 class Token(object):
-    def __init__(self, name, value):
+    def __init__(self, name, value=None):
         self.type = name
-        self.value = value
+        self.value = value or name
 
     def __eq__(self, other):
         if isinstance(other, Token):
             return self.type == other.type and self.value == other.value
-        elif isinstance(other, basestring):
-            return self.value == other
         return False
 
     def __repr__(self):
@@ -139,7 +137,7 @@ class Lexer:
         if self.chars:
             if self.state is None:
                 for c in self.chars:
-                    yield c
+                    yield Token(c, c)
             else:
                 raise ParseError('Error, unterminated %s' % name(self.state))
 
@@ -155,9 +153,9 @@ class Lexer:
             self.state = self._string
             self.nesting_level = 1
         if self.state is None:
-            chars = self.chars
+            tokens = [Token(c, c) for c in self.chars]
             self.chars = []
-            return chars
+            return tokens
         return []
 
     def _string(self, c):
@@ -199,10 +197,6 @@ def substmacro(name, body, args):
     return body
 
 
-def tokvalue(tok):
-    return tok.value if isinstance(tok, Token) else tok
-
-
 class Parser:
     def __init__(self, text):
         self.macros = {
@@ -221,7 +215,7 @@ class Parser:
     def _builtin_dnl(self, args):
         # Eat tokens till newline
         for tok in self.token_iter:
-            if tok == '\n':
+            if tok.value == '\n':
                 break
         return None
 
@@ -235,15 +229,16 @@ class Parser:
         if self.token_iter.peek_char() == '(':
             # drop that token
             tok = self.token_iter.next()
-            if tok != '(':
-                raise ParseError('Expected open parenthesis but got %s' % tok)
+            if tok.value != '(':
+                raise ParseError('Expected open parenthesis but got %s'
+                                 % tok.value)
             for tok in self._expand_tokens():
-                if tok == ',' or tok == ')':
+                if tok.value == ',' or tok.value == ')':
                     args.append(''.join(current_arg))
                     current_arg = []
                 else:
-                    current_arg.append(tokvalue(tok))
-                if tok == ')':
+                    current_arg.append(tok.value)
+                if tok.value == ')':
                     break
             # TODO: handle EOF without closing paren
         return args
@@ -269,7 +264,7 @@ class Parser:
 
     def parse(self, stream=sys.stdout):
         for tok in self._expand_tokens():
-            stream.write(tokvalue(tok))
+            stream.write(tok.value)
 
 
 if __name__ == '__main__':

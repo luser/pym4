@@ -10,6 +10,7 @@ from m4 import (
     peek_insert_iter,
     Lexer,
     Parser,
+    Token,
     EOF,
 )
 
@@ -76,22 +77,29 @@ class LexerTests(unittest.TestCase):
     def test_basic(self):
         tokens = self.lex('abc xy_z _foo')
         self.assertEqual(tokens,
-                         ['abc', ' ', 'xy_z', ' ', '_foo'])
+                         [Token('IDENTIFIER', 'abc'),
+                          Token(' '),
+                          Token('IDENTIFIER', 'xy_z'),
+                          Token(' '),
+                          Token('IDENTIFIER', '_foo')])
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
         self.assertEqual(tokens[0].value, 'abc')
-        self.assertEqual(tokens[1], ' ')
-        self.assertTrue(isinstance(tokens[1], basestring))
+        self.assertEqual(tokens[1].value, ' ')
         self.assertEqual(self.lex('_abc123 123'),
-                         ['_abc123', ' ', '1', '2', '3'])
+                         [Token('IDENTIFIER', '_abc123'),
+                          Token(' '),
+                          Token('1'),
+                          Token('2'),
+                          Token('3')])
 
         tokens = self.lex('1abc')
         self.assertEqual(len(tokens), 2)
-        self.assertEqual(tokens[0], '1')
+        self.assertEqual(tokens[0], Token('1'))
         self.assertEqual(tokens[1].type, 'IDENTIFIER')
         self.assertEqual(tokens[1].value, 'abc')
 
         text = '([{}])=+-,.?/|\n'
-        self.assertEqual(self.lex(text), list(text))
+        self.assertEqual(self.lex(text), [Token(c) for c in text])
 
     def test_strings(self):
         tokens = self.lex("`abc'")
@@ -112,7 +120,7 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(len(tokens), 3)
         self.assertEqual(tokens[0].type, 'STRING')
         self.assertEqual(tokens[0].value, 'foo')
-        self.assertEqual(tokens[1], ' ')
+        self.assertEqual(tokens[1], Token(' '))
         self.assertEqual(tokens[2].type, 'STRING')
         self.assertEqual(tokens[2].value, 'foo')
 
@@ -139,12 +147,12 @@ class LexerTests(unittest.TestCase):
         # changing the quote characters should make the default quote
         # characters be treated as normal characters.
         token = i.next()
-        self.assertEqual(token, '`')
+        self.assertEqual(token, Token('`'))
         token = i.next()
         self.assertEqual(token.type, 'IDENTIFIER')
         self.assertEqual(token.value, 'abc')
         token = i.next()
-        self.assertEqual(token, '\'')
+        self.assertEqual(token, Token('\''))
         # ...and the new quote characters should work
         token = i.next()
         self.assertEqual(token.type, 'STRING')
@@ -165,7 +173,7 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(len(tokens), 3)
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
         self.assertEqual(tokens[0].value, 'foo')
-        self.assertEqual(tokens[1], ' ')
+        self.assertEqual(tokens[1], Token(' '))
         self.assertEqual(tokens[2].type, 'COMMENT')
         self.assertEqual(tokens[2].value, '# foo')
 
@@ -182,7 +190,7 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(tokens[0].value, 'foo')
         self.assertEqual(tokens[1].type, 'COMMENT')
         self.assertEqual(tokens[1].value, '#foo')
-        self.assertEqual(tokens[2], '\n')
+        self.assertEqual(tokens[2], Token('\n'))
         self.assertEqual(tokens[3].type, 'IDENTIFIER')
         self.assertEqual(tokens[3].value, 'foo')
 
@@ -197,7 +205,7 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(token.type, 'IDENTIFIER')
         self.assertEqual(token.value, 'foo')
         token = i.next()
-        self.assertEqual(token, ' ')
+        self.assertEqual(token, Token(' '))
         token = i.next()
         self.assertEqual(token.type, 'IDENTIFIER')
         self.assertEqual(token.value, 'xyz')
@@ -222,7 +230,7 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(token.value, 'abc')
         self.assertEqual(i.peek_char(), ' ')
         token = i.next()
-        self.assertEqual(token, ' ')
+        self.assertEqual(token, Token(' '))
         self.assertEqual(i.peek_char(), 'x')
         token = i.next()
         self.assertEqual(token.type, 'IDENTIFIER')
