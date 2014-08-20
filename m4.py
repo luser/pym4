@@ -40,10 +40,6 @@ def endswith(l, e):
     return l[-len(e):] == e
 
 
-def rmend(l, e):
-    return l[:-len(e)]
-
-
 def name(x):
     return x.__name__ if hasattr(x, '__name__') else x
 
@@ -160,18 +156,6 @@ class Lexer:
 
         self.state = None
         return [self._finish_token('COMMENT')]
-
-
-class PLYCompatLexer(object):
-    def __init__(self, text):
-        self.text = text
-        self.token_stream = Lexer(text).parse()
-
-    def token(self):
-        try:
-            return self.token_stream.next()
-        except StopIteration:
-            return None
 
 
 def substmacro(name, body, args):
