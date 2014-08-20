@@ -166,6 +166,17 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(token.type, 'IDENTIFIER')
         self.assertEqual(token.value, 'xyz')
 
+    def test_insert_eof(self):
+        lex = Lexer('abc')
+        i = lex.parse()
+        token = i.next()
+        self.assertEqual(token.type, 'IDENTIFIER')
+        self.assertEqual(token.value, 'abc')
+        lex.insert_text('foo')
+        token = i.next()
+        self.assertEqual(token.type, 'IDENTIFIER')
+        self.assertEqual(token.value, 'foo')
+
 
 class ParserTests(unittest.TestCase):
     def parse(self, parser):
@@ -182,6 +193,11 @@ class ParserTests(unittest.TestCase):
         p = Parser('abc')
         p.define('abc', 'xyz')
         self.assertEqual(self.parse(p), 'xyz')
+
+    def test_define_simple_trailing(self):
+        p = Parser('abc ')
+        p.define('abc', 'xyz')
+        self.assertEqual(self.parse(p), 'xyz ')
 
     def test_define_recursive(self):
         p = Parser('abc')
