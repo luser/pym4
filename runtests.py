@@ -261,6 +261,10 @@ class ParserTests(unittest.TestCase):
         p.define('xyz', '123')
         self.assertEqual(self.parse(p), '123')
 
+    def test_define_argparse(self):
+        p = Parser('define( abc, xyz)abc')
+        self.assertEqual(self.parse(p), 'xyz')
+
     def test_changequote(self):
         p = Parser("`abc'[xyz]")
         p.changequote('[', ']')
