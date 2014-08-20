@@ -3,12 +3,14 @@
 import itertools
 import sys
 
+
 class ParseError(Exception):
     def __init__(self, message):
         self.message = message
 
     def __str__(self):
         return 'ParseError(%s)' % self.message
+
 
 class Token(object):
     def __init__(self, name, value):
@@ -25,19 +27,26 @@ class Token(object):
     def __repr__(self):
         return "<Token: %r %r>" % (self.type, self.value)
 
+
 class eof(str):
     def __repr__(self):
         return '<EOF>'
+
+
 EOF = eof()
+
 
 def endswith(l, e):
     return l[-len(e):] == e
 
+
 def rmend(l, e):
     return l[:-len(e)]
 
+
 def name(x):
     return x.__name__ if hasattr(x, '__name__') else x
+
 
 class peek_insert_iter:
     def __init__(self, iter):
@@ -72,6 +81,7 @@ class peek_insert_iter:
         if self.peeked:
             return self.peeked[0]
         return EOF
+
 
 class Lexer:
     def __init__(self, text):
@@ -108,7 +118,7 @@ class Lexer:
                 for c in self.chars:
                     yield c
             else:
-                raise ParseError('Error, unterminated %s' % self.state.__name__)
+                raise ParseError('Error, unterminated %s' % name(self.state))
 
     def _generic(self, c):
         if c is not EOF:
@@ -121,9 +131,9 @@ class Lexer:
         if self.chars == self.start_quote:
             self.state = self._string
         if self.state is None:
-             chars = self.chars
-             self.chars = []
-             return chars
+            chars = self.chars
+            self.chars = []
+            return chars
         return []
 
     def _string(self, c):
@@ -151,6 +161,7 @@ class Lexer:
         self.state = None
         return [self._finish_token('COMMENT')]
 
+
 class PLYCompatLexer(object):
     def __init__(self, text):
         self.text = text
@@ -162,9 +173,15 @@ class PLYCompatLexer(object):
         except StopIteration:
             return None
 
+
 def substmacro(name, body, args):
     # TODO: implement argument substitution
     return body
+
+
+def tokvalue(tok):
+    return tok.value if isinstance(tok, Token) else tok
+
 
 class Parser:
     def __init__(self, text):
@@ -205,14 +222,18 @@ class Parser:
                     args.append(''.join(current_arg))
                     current_arg = []
                 else:
-                    current_arg.append(tok.value if isinstance(tok, Token) else tok)
+                    current_arg.append(tokvalue(tok))
                 if tok == ')':
                     break
         return args
 
     def expand_tokens(self):
         for tok in self.token_iter:
-            if isinstance(tok, Token) and tok.type == 'IDENTIFIER' and tok.value in self.macros:
+            if (
+                    isinstance(tok, Token)
+                    and tok.type == 'IDENTIFIER'
+                    and tok.value in self.macros
+            ):
                 result = self.macros[tok.value](self._parse_args())
                 if result:
                     # TODO: push back
@@ -222,7 +243,8 @@ class Parser:
 
     def parse(self, stream=sys.stdout):
         for tok in self.expand_tokens():
-            stream.write(tok.value if isinstance(tok, Token) else tok)
+            stream.write(tokvalue(tok))
+
 
 if __name__ == '__main__':
     Parser(sys.stdin.read()).parse()
