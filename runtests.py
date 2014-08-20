@@ -43,7 +43,7 @@ class IterTests(unittest.TestCase):
         self.assertEqual(i.next(), 2)
         self.assertEqual(i.peek(), 3)
         self.assertEqual(i.next(), 3)
-        self.assertEqual(i.peek(), EOF)
+        self.assertIs(i.peek(), EOF)
 
     def test_peek_insert(self):
         i = peek_insert_iter(iter([1, 2, 3]))
@@ -62,11 +62,11 @@ class IterTests(unittest.TestCase):
         self.assertEqual(i.next(), 5)
         self.assertEqual(i.next(), 2)
         self.assertEqual(i.next(), 3)
-        self.assertEqual(i.peek(), EOF)
+        self.assertIs(i.peek(), EOF)
         i.insert([8])
         self.assertEqual(i.peek(), 8)
         self.assertEqual(i.next(), 8)
-        self.assertEqual(i.peek(), EOF)
+        self.assertIs(i.peek(), EOF)
 
 
 class LexerTests(unittest.TestCase):
@@ -181,12 +181,32 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(token.type, 'IDENTIFIER')
         self.assertEqual(token.value, 'foo')
 
+    def test_peek_char(self):
+        lex = Lexer('abc xyz')
+        i = lex.parse()
+        self.assertEqual(i.peek_char(), 'a')
+        token = i.next()
+        self.assertEqual(token.type, 'IDENTIFIER')
+        self.assertEqual(token.value, 'abc')
+        self.assertEqual(i.peek_char(), ' ')
+        token = i.next()
+        self.assertEqual(token, ' ')
+        self.assertEqual(i.peek_char(), 'x')
+        token = i.next()
+        self.assertEqual(token.type, 'IDENTIFIER')
+        self.assertEqual(token.value, 'xyz')
+        self.assertIs(i.peek_char(), EOF)
+
 
 class ParserTests(unittest.TestCase):
     def parse(self, parser):
         stream = StringIO()
         parser.parse(stream=stream)
         return stream.getvalue()
+
+    def test_basic(self):
+        p = Parser('abc')
+        self.assertEqual(self.parse(p), 'abc')
 
     def test_define_empty(self):
         p = Parser('abc')

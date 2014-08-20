@@ -97,7 +97,29 @@ class Lexer:
         self.iter.insert(text)
 
     def parse(self):
+        '''
+        Return an iterator that produces tokens. The iterator
+        has one extra method: peek_char, that allows consumers
+        to peek at the next character before it is lexed.
+        '''
+        lexer = self
+
+        class peekthrough_iter:
+            def __init__(self, iter):
+                self.iter = iter
+
+            def __iter__(self):
+                return self.iter
+
+            def next(self):
+                return self.iter.next()
+
+            def peek_char(self):
+                return lexer.iter.peek()
         self.iter = peek_insert_iter(iter(self.text))
+        return peekthrough_iter(self._parse_internal())
+
+    def _parse_internal(self):
         while True:
             c = self.iter.peek()
             #print 'CHAR: %s (state: %s)' % (repr(c), name(self.state))
@@ -107,7 +129,7 @@ class Lexer:
                 tokens = self._generic(c)
             for tok in tokens:
                 yield tok
-            if c is EOF:
+            if c is EOF and self.iter.peek() is EOF:
                 break
         if self.chars:
             if self.state is None:
@@ -175,7 +197,7 @@ class Parser:
             # TODO: changequote
         }
         self.lexer = Lexer(text)
-        self.token_iter = peek_insert_iter(self.lexer.parse())
+        self.token_iter = self.lexer.parse()
 
     def _builtin_define(self, args):
         if args:
@@ -190,12 +212,13 @@ class Parser:
         return None
 
     def _parse_args(self):
-        tok = self.token_iter.peek()
         args = []
         current_arg = []
-        if tok == '(':
+        if self.token_iter.peek_char() == '(':
             # drop that token
-            self.token_iter.next()
+            tok = self.token_iter.next()
+            if tok != '(':
+                raise ParseError('Expected open parenthesis but got %s' % tok)
             for tok in self._expand_tokens():
                 if tok == ',' or tok == ')':
                     args.append(''.join(current_arg))
@@ -204,6 +227,7 @@ class Parser:
                     current_arg.append(tokvalue(tok))
                 if tok == ')':
                     break
+            # TODO: handle EOF without closing paren
         return args
 
     def _expand_tokens(self):
