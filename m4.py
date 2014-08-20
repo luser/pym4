@@ -170,14 +170,14 @@ def tokvalue(tok):
 class Parser:
     def __init__(self, text):
         self.macros = {
-            'define': self.define,
-            'dnl': self.dnl,
+            'define': self._builtin_define,
+            'dnl': self._builtin_dnl,
             # TODO: changequote
         }
         self.lexer = Lexer(text)
         self.token_iter = peek_insert_iter(self.lexer.parse())
 
-    def define(self, args):
+    def _builtin_define(self, args):
         if args:
             name = args[0]
             if len(args) >= 2:
@@ -187,7 +187,7 @@ class Parser:
             self.macros[name] = lambda x: substmacro(name, body, x)
         return None
 
-    def dnl(self, args):
+    def _builtin_dnl(self, args):
         # Eat tokens till newline
         for tok in self.token_iter:
             if tok == '\n':
@@ -201,7 +201,7 @@ class Parser:
         if tok == '(':
             # drop that token
             self.token_iter.next()
-            for tok in self.expand_tokens():
+            for tok in self._expand_tokens():
                 if tok == ',' or tok == ')':
                     args.append(''.join(current_arg))
                     current_arg = []
@@ -211,7 +211,7 @@ class Parser:
                     break
         return args
 
-    def expand_tokens(self):
+    def _expand_tokens(self):
         for tok in self.token_iter:
             if (
                     isinstance(tok, Token)
@@ -226,7 +226,7 @@ class Parser:
                 yield tok
 
     def parse(self, stream=sys.stdout):
-        for tok in self.expand_tokens():
+        for tok in self._expand_tokens():
             stream.write(tokvalue(tok))
 
 
