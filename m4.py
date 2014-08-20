@@ -17,7 +17,7 @@ class ParseError(Exception):
 class Token(object):
     def __init__(self, name, value=None):
         self.type = name
-        self.value = value or name
+        self.value = name if value is None else value
 
     def __eq__(self, other):
         if isinstance(other, Token):

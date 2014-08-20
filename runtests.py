@@ -102,6 +102,11 @@ class LexerTests(unittest.TestCase):
         self.assertEqual(self.lex(text), [Token(c) for c in text])
 
     def test_strings(self):
+        tokens = self.lex("`'")
+        self.assertEqual(len(tokens), 1)
+        self.assertEqual(tokens[0].type, 'STRING')
+        self.assertEqual(tokens[0].value, '')
+
         tokens = self.lex("`abc'")
         self.assertEqual(len(tokens), 1)
         self.assertEqual(tokens[0].type, 'STRING')
@@ -247,6 +252,10 @@ class ParserTests(unittest.TestCase):
     def test_basic(self):
         p = Parser('abc')
         self.assertEqual(self.parse(p), 'abc')
+
+    def test_empty_string(self):
+        p = Parser("`'")
+        self.assertEqual(self.parse(p), '')
 
     def test_define_empty(self):
         p = Parser('abc')
