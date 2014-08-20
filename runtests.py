@@ -28,8 +28,12 @@ class IterTests(unittest.TestCase):
         self.assertEqual(i.next(), 5)
         self.assertEqual(i.next(), 2)
         self.assertEqual(i.next(), 3)
+        with self.assertRaises(StopIteration):
+            i.next()
         i.insert([8])
         self.assertEqual(i.next(), 8)
+        with self.assertRaises(StopIteration):
+            i.next()
 
     def test_peek(self):
         i = peek_insert_iter(iter([1, 2, 3]))
