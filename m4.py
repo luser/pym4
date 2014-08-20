@@ -7,12 +7,13 @@ class ParseError(Exception):
     def __init__(self, message):
         self.message = message
 
+    def __str__(self):
+        return 'ParseError(%s)' % self.message
+
 class Token(object):
-    def __init__(self, name, value, lexpos, lineno):
+    def __init__(self, name, value):
         self.type = name
         self.value = value
-        self.lexpos = lexpos
-        self.lineno = lineno
 
     def __eq__(self, other):
         if isinstance(other, Token):
@@ -76,15 +77,13 @@ class Lexer:
     def __init__(self, text):
         self.text = text
         self.state = None
-        self.lexpos = 0
-        self.lineno = 0
         self.chars = []
         self.start_quote = ['`']
         self.end_quote = ["'"]
         self.iter = None
 
     def _finish_token(self, name):
-        t = Token(name, ''.join(self.chars), self.lexpos, self.lineno)
+        t = Token(name, ''.join(self.chars))
         self.chars = []
         return t
 
@@ -92,32 +91,28 @@ class Lexer:
         self.iter.insert(text)
 
     def parse(self):
-        self.iter = peek_insert_iter(itertools.chain(iter(self.text), [EOF]))
-        for i, c in enumerate(self.iter):
-            self.lexpos = i
-            if c == '\n':
-                self.lineno += 1
+        self.iter = peek_insert_iter(iter(self.text))
+        while True:
+            c = self.iter.peek()
             #print 'CHAR: %s (state: %s)' % (repr(c), name(self.state))
-            tokens, consumed = ([], False)
-            while not consumed:
-                if self.state is not None:
-                    tokens, consumed = self.state(c)
-                else:
-                    tokens, consumed = self._generic(c)
-                for tok in tokens:
-                    yield tok
-                if c is EOF:
-                    break
+            if self.state is not None:
+                tokens = self.state(c)
+            else:
+                tokens = self._generic(c)
+            for tok in tokens:
+                yield tok
+            if c is EOF:
+                break
         if self.chars:
             if self.state is None:
                 for c in self.chars:
                     yield c
             else:
-                raise ParseError('Error, unterminated %s' % self.state)
+                raise ParseError('Error, unterminated %s' % self.state.__name__)
 
     def _generic(self, c):
         if c is not EOF:
-            self.chars.append(c)
+            self.chars.append(self.iter.next())
         if c.isalpha() or c == '_':
             self.state = self._identifier
         elif c == '#':
@@ -128,33 +123,33 @@ class Lexer:
         if self.state is None:
              chars = self.chars
              self.chars = []
-             return chars, True
-        return [], True
+             return chars
+        return []
 
     def _string(self, c):
-        self.chars.append(c)
+        self.chars.append(self.iter.next())
         if endswith(self.chars, self.end_quote):
             # strip start/end quote out of the token value
             self.chars = self.chars[len(self.start_quote):-len(self.end_quote)]
             self.state = None
-            return [self._finish_token('STRING')], True
-        return [], True
+            return [self._finish_token('STRING')]
+        return []
 
     def _identifier(self, c):
         if not (c.isalnum() or c == '_'):
             self.state = None
-            return [self._finish_token('IDENTIFIER')], False
+            return [self._finish_token('IDENTIFIER')]
 
-        self.chars.append(c)
-        return [], True
+        self.chars.append(self.iter.next())
+        return []
 
     def _comment(self, c):
         if c != '\n' and c is not EOF:
-            self.chars.append(c)
-            return [], True
+            self.chars.append(self.iter.next())
+            return []
 
         self.state = None
-        return [self._finish_token('COMMENT')], False
+        return [self._finish_token('COMMENT')]
 
 class PLYCompatLexer(object):
     def __init__(self, text):
