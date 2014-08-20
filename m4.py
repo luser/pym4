@@ -38,6 +38,40 @@ def rmend(l, e):
 def name(x):
     return x.__name__ if hasattr(x, '__name__') else x
 
+class peek_insert_iter:
+    def __init__(self, iter):
+        self.iter = iter
+        self.inserted = []
+        self.peeked = []
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.inserted:
+            return self.inserted.pop(0)
+        if self.peeked:
+            return self.peeked.pop(0)
+        return self.iter.next()
+
+    def insert(self, iterable):
+        self.inserted[0:0] = iterable
+
+    def _peek(self):
+        if not self.peeked:
+            try:
+                self.peeked.append(self.iter.next())
+            except StopIteration:
+                pass
+
+    def peek(self):
+        if self.inserted:
+            return self.inserted[0]
+        self._peek()
+        if self.peeked:
+            return self.peeked[0]
+        return EOF
+
 class Lexer:
     def __init__(self, text):
         self.text = text
@@ -47,14 +81,19 @@ class Lexer:
         self.chars = []
         self.start_quote = ['`']
         self.end_quote = ["'"]
+        self.iter = None
 
-    def finish_token(self, name):
+    def _finish_token(self, name):
         t = Token(name, ''.join(self.chars), self.lexpos, self.lineno)
         self.chars = []
         return t
 
+    def insert_text(self, text):
+        self.iter.insert(text)
+
     def parse(self):
-        for i, c in enumerate(itertools.chain(self.text, [EOF])):
+        self.iter = peek_insert_iter(itertools.chain(iter(self.text), [EOF]))
+        for i, c in enumerate(self.iter):
             self.lexpos = i
             if c == '\n':
                 self.lineno += 1
@@ -64,7 +103,7 @@ class Lexer:
                 if self.state is not None:
                     tokens, consumed = self.state(c)
                 else:
-                    tokens, consumed = self.generic(c)
+                    tokens, consumed = self._generic(c)
                 for tok in tokens:
                     yield tok
                 if c is EOF:
@@ -76,46 +115,46 @@ class Lexer:
             else:
                 raise ParseError('Error, unterminated %s' % self.state)
 
-    def generic(self, c):
+    def _generic(self, c):
         if c is not EOF:
             self.chars.append(c)
         if c.isalpha() or c == '_':
-            self.state = self.identifier
+            self.state = self._identifier
         elif c == '#':
-            self.state = self.comment
+            self.state = self._comment
         # TODO: handle multi-character quotes
         if self.chars == self.start_quote:
-            self.state = self.string
+            self.state = self._string
         if self.state is None:
              chars = self.chars
              self.chars = []
              return chars, True
         return [], True
 
-    def string(self, c):
+    def _string(self, c):
         self.chars.append(c)
         if endswith(self.chars, self.end_quote):
             # strip start/end quote out of the token value
             self.chars = self.chars[len(self.start_quote):-len(self.end_quote)]
             self.state = None
-            return [self.finish_token('STRING')], True
+            return [self._finish_token('STRING')], True
         return [], True
 
-    def identifier(self, c):
+    def _identifier(self, c):
         if not (c.isalnum() or c == '_'):
             self.state = None
-            return [self.finish_token('IDENTIFIER')], False
+            return [self._finish_token('IDENTIFIER')], False
 
         self.chars.append(c)
         return [], True
 
-    def comment(self, c):
+    def _comment(self, c):
         if c != '\n' and c is not EOF:
             self.chars.append(c)
             return [], True
 
         self.state = None
-        return [self.finish_token('COMMENT')], False
+        return [self._finish_token('COMMENT')], False
 
 class PLYCompatLexer(object):
     def __init__(self, text):
@@ -127,34 +166,6 @@ class PLYCompatLexer(object):
             return self.token_stream.next()
         except StopIteration:
             return None
-
-class peekiter:
-    EOF = EOF
-    def __init__(self, iter):
-        self.iter = iter
-        self.done = False
-        self._peek()
-
-    def __iter__(self):
-        return self
-
-    def next(self):
-        if self.done:
-            raise StopIteration
-        n = self._next
-        self._peek()
-        return n
-
-    def _peek(self):
-        try:
-            self._next = self.iter.next()
-        except StopIteration:
-            self.done = True
-
-    def peek(self):
-        if self.done:
-            return self.EOF
-        return self._next
 
 def substmacro(name, body, args):
     # TODO: implement argument substitution
@@ -168,7 +179,7 @@ class Parser:
             # TODO: changequote
         }
         self.lexer = Lexer(text)
-        self.token_iter = peekiter(self.lexer.parse())
+        self.token_iter = peek_insert_iter(self.lexer.parse())
 
     def define(self, args):
         if args:
