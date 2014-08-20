@@ -1,0 +1,14 @@
+this is the beginning
+divert(2)
+this is 2
+divert(1)
+this is 1
+divert(100)
+this is 100
+divert(3)
+this is 3
+divert(-1)
+this should not appear
+nor should this
+divert
+this is the end

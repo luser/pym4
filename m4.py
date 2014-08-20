@@ -3,6 +3,8 @@
 import itertools
 import sys
 
+from collections import defaultdict
+
 
 class ParseError(Exception):
     def __init__(self, message):
@@ -203,9 +205,12 @@ class Parser:
             'define': self._builtin_define,
             'dnl': self._builtin_dnl,
             'changequote': self._builtin_changequote,
+            'divert': self._builtin_divert,
         }
         self.lexer = Lexer(text)
         self.token_iter = self.lexer.parse()
+        self.diversions = defaultdict(list)
+        self.current_diversion = 0
 
     def _builtin_define(self, args):
         if args:
@@ -221,6 +226,16 @@ class Parser:
 
     def _builtin_changequote(self, args):
         self.changequote(*args[:2])
+        return None
+
+    def _builtin_divert(self, args):
+        args = args or [0]
+        try:
+            self.current_diversion = int(args[0])
+        except ValueError:
+            # GNU m4 prints a warning here:
+            # m4:stdin:1: non-numeric argument to builtin `divert'
+            return
         return None
 
     def _parse_args(self):
@@ -264,7 +279,15 @@ class Parser:
 
     def parse(self, stream=sys.stdout):
         for tok in self._expand_tokens():
-            stream.write(tok.value)
+            if self.current_diversion == 0:
+                stream.write(tok.value)
+            elif self.current_diversion > 0:
+                self.diversions[self.current_diversion].append(tok.value)
+        for diversion in sorted(self.diversions.keys()):
+            if diversion < 1:
+                continue
+            stream.write(''.join(self.diversions[diversion]))
+            self.diversions[diversion] = []
 
 
 if __name__ == '__main__':
