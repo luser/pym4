@@ -247,14 +247,19 @@ class Parser:
             if tok.value != '(':
                 raise ParseError('Expected open parenthesis but got %s'
                                  % tok.value)
+            nesting_level = 1
             for tok in self._expand_tokens():
-                if tok.value == ',' or tok.value == ')':
+                if tok.value == '(':
+                    nesting_level += 1
+                elif tok.value == ',' or tok.value == ')':
                     args.append(''.join(current_arg))
                     current_arg = []
                 elif current_arg or not tok.value.isspace():
                     current_arg.append(tok.value)
                 if tok.value == ')':
-                    break
+                    nesting_level -= 1
+                    if nesting_level == 0:
+                        break
             # TODO: handle EOF without closing paren
         return args
 

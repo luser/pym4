@@ -287,6 +287,11 @@ class ParserTests(unittest.TestCase):
         p.changequote('[', ']')
         self.assertEqual(self.parse(p), "`abc'xyz")
 
+    def test_macro_args_nested_parens(self):
+        p = Parser('foo(abc(xyz)abc)')
+        p.define('foo', 'bar')
+        self.assertEqual(self.parse(p), 'bar')
+
 
 class ComparisonTests(unittest.TestCase):
     def check_file(self, input_file, expected_file, thing):
