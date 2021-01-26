@@ -58,7 +58,7 @@ class peek_insert_iter:
             return self.inserted.pop(0)
         if self.peeked:
             return self.peeked.pop(0)
-        return self.iter.next()
+        return next(self.iter)
 
     def insert(self, iterable):
         self.inserted[0:0] = iterable
@@ -66,7 +66,7 @@ class peek_insert_iter:
     def _peek(self):
         if not self.peeked:
             try:
-                self.peeked.append(self.iter.next())
+                self.peeked.append(next(self.iter))
             except StopIteration:
                 pass
 
@@ -117,7 +117,7 @@ class Lexer:
                 return self.iter
 
             def next(self):
-                return self.iter.next()
+                return next(self.iter)
 
             def peek_char(self):
                 return lexer.iter.peek()
@@ -127,7 +127,7 @@ class Lexer:
     def _parse_internal(self):
         while True:
             c = self.iter.peek()
-            #print 'CHAR: %s (state: %s)' % (repr(c), name(self.state))
+            #print('CHAR: %s (state: %s)' % (repr(c), name(self.state)))
             if self.state is not None:
                 tokens = self.state(c)
             else:
