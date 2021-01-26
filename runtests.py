@@ -4,7 +4,7 @@ import glob
 import os
 import subprocess
 import unittest
-from StringIO import StringIO
+from io import StringIO
 
 from m4 import (
     peek_insert_iter,
@@ -295,14 +295,17 @@ class ParserTests(unittest.TestCase):
 
 class ComparisonTests(unittest.TestCase):
     def check_file(self, input_file, expected_file, thing):
-        expected = open(expected_file, 'r').read()
+        with open(expected_file, 'r') as f:
+            expected = f.read()
         if thing == 'm4':
             # check m4 output
-            m4_output = subprocess.check_output(['m4', input_file])
+            m4_output = subprocess.check_output(['m4', input_file]).decode()
             self.assertEqual(m4_output, expected)
         elif thing == 'parser':
+            with open(input_file, 'r') as f:
+                inp = f.read()
             stream = StringIO()
-            Parser(open(input_file, 'r').read()).parse(stream=stream)
+            Parser(inp).parse(stream=stream)
             self.assertEqual(stream.getvalue(), expected)
 
 
