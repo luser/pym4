@@ -1,10 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import glob
 import os
 import subprocess
 import unittest
-from StringIO import StringIO
+from io import BytesIO
 
 from m4 import (
     peek_insert_iter,
@@ -19,54 +19,54 @@ class IterTests(unittest.TestCase):
     def test_insert(self):
         i = peek_insert_iter(iter([1, 2, 3]))
         i.insert([10])
-        self.assertEqual(i.next(), 10)
-        self.assertEqual(i.next(), 1)
+        self.assertEqual(next(i), 10)
+        self.assertEqual(next(i), 1)
         i.insert([4, 5])
         i.insert([6, 7])
-        self.assertEqual(i.next(), 6)
-        self.assertEqual(i.next(), 7)
-        self.assertEqual(i.next(), 4)
-        self.assertEqual(i.next(), 5)
-        self.assertEqual(i.next(), 2)
-        self.assertEqual(i.next(), 3)
+        self.assertEqual(next(i), 6)
+        self.assertEqual(next(i), 7)
+        self.assertEqual(next(i), 4)
+        self.assertEqual(next(i), 5)
+        self.assertEqual(next(i), 2)
+        self.assertEqual(next(i), 3)
         with self.assertRaises(StopIteration):
-            i.next()
+            next(i)
         i.insert([8])
-        self.assertEqual(i.next(), 8)
+        self.assertEqual(next(i), 8)
         with self.assertRaises(StopIteration):
-            i.next()
+            next(i)
 
     def test_peek(self):
         i = peek_insert_iter(iter([1, 2, 3]))
         self.assertEqual(i.peek(), 1)
-        self.assertEqual(i.next(), 1)
+        self.assertEqual(next(i), 1)
         self.assertEqual(i.peek(), 2)
-        self.assertEqual(i.next(), 2)
+        self.assertEqual(next(i), 2)
         self.assertEqual(i.peek(), 3)
-        self.assertEqual(i.next(), 3)
+        self.assertEqual(next(i), 3)
         self.assertIs(i.peek(), EOF)
 
     def test_peek_insert(self):
         i = peek_insert_iter(iter([1, 2, 3]))
         i.insert([10])
         self.assertEqual(i.peek(), 10)
-        self.assertEqual(i.next(), 10)
+        self.assertEqual(next(i), 10)
         self.assertEqual(i.peek(), 1)
-        self.assertEqual(i.next(), 1)
+        self.assertEqual(next(i), 1)
         i.insert([4, 5])
         self.assertEqual(i.peek(), 4)
         i.insert([6, 7])
         self.assertEqual(i.peek(), 6)
-        self.assertEqual(i.next(), 6)
-        self.assertEqual(i.next(), 7)
-        self.assertEqual(i.next(), 4)
-        self.assertEqual(i.next(), 5)
-        self.assertEqual(i.next(), 2)
-        self.assertEqual(i.next(), 3)
+        self.assertEqual(next(i), 6)
+        self.assertEqual(next(i), 7)
+        self.assertEqual(next(i), 4)
+        self.assertEqual(next(i), 5)
+        self.assertEqual(next(i), 2)
+        self.assertEqual(next(i), 3)
         self.assertIs(i.peek(), EOF)
         i.insert([8])
         self.assertEqual(i.peek(), 8)
-        self.assertEqual(i.next(), 8)
+        self.assertEqual(next(i), 8)
         self.assertIs(i.peek(), EOF)
 
 
@@ -75,242 +75,245 @@ class LexerTests(unittest.TestCase):
         return list(Lexer(text).parse())
 
     def test_basic(self):
-        tokens = self.lex('abc xy_z _foo')
+        tokens = self.lex(b'abc xy_z _foo')
         self.assertEqual(tokens,
-                         [Token('IDENTIFIER', 'abc'),
-                          Token(' '),
-                          Token('IDENTIFIER', 'xy_z'),
-                          Token(' '),
-                          Token('IDENTIFIER', '_foo')])
+                         [Token('IDENTIFIER', b'abc'),
+                          Token(b' '),
+                          Token('IDENTIFIER', b'xy_z'),
+                          Token(b' '),
+                          Token('IDENTIFIER', b'_foo')])
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
-        self.assertEqual(tokens[0].value, 'abc')
-        self.assertEqual(tokens[1].value, ' ')
-        self.assertEqual(self.lex('_abc123 123'),
-                         [Token('IDENTIFIER', '_abc123'),
-                          Token(' '),
-                          Token('1'),
-                          Token('2'),
-                          Token('3')])
+        self.assertEqual(tokens[0].value, b'abc')
+        self.assertEqual(tokens[1].value, b' ')
+        self.assertEqual(self.lex(b'_abc123 123'),
+                         [Token('IDENTIFIER', b'_abc123'),
+                          Token(b' '),
+                          Token(b'1'),
+                          Token(b'2'),
+                          Token(b'3')])
 
-        tokens = self.lex('1abc')
+        tokens = self.lex(b'1abc')
         self.assertEqual(len(tokens), 2)
-        self.assertEqual(tokens[0], Token('1'))
+        self.assertEqual(tokens[0], Token(b'1'))
         self.assertEqual(tokens[1].type, 'IDENTIFIER')
-        self.assertEqual(tokens[1].value, 'abc')
+        self.assertEqual(tokens[1].value, b'abc')
 
-        text = '([{}])=+-,.?/|\n'
-        self.assertEqual(self.lex(text), [Token(c) for c in text])
+        text = b'([{}])=+-,.?/|\n'
+        self.assertEqual(self.lex(text), [Token(bytes([c])) for c in text])
 
     def test_strings(self):
-        tokens = self.lex("`'")
+        tokens = self.lex(b"`'")
         self.assertEqual(len(tokens), 1)
         self.assertEqual(tokens[0].type, 'STRING')
-        self.assertEqual(tokens[0].value, '')
+        self.assertEqual(tokens[0].value, b'')
 
-        tokens = self.lex("`abc'")
+        tokens = self.lex(b"`abc'")
         self.assertEqual(len(tokens), 1)
         self.assertEqual(tokens[0].type, 'STRING')
-        self.assertEqual(tokens[0].value, 'abc')
+        self.assertEqual(tokens[0].value, b'abc')
 
-        tokens = self.lex("foo`abc'foo")
+        tokens = self.lex(b"foo`abc'foo")
         self.assertEqual(len(tokens), 3)
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
-        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[0].value, b'foo')
         self.assertEqual(tokens[1].type, 'STRING')
-        self.assertEqual(tokens[1].value, 'abc')
+        self.assertEqual(tokens[1].value, b'abc')
         self.assertEqual(tokens[2].type, 'IDENTIFIER')
-        self.assertEqual(tokens[2].value, 'foo')
+        self.assertEqual(tokens[2].value, b'foo')
 
-        tokens = self.lex("`foo' `foo'")
+        tokens = self.lex(b"`foo' `foo'")
         self.assertEqual(len(tokens), 3)
         self.assertEqual(tokens[0].type, 'STRING')
-        self.assertEqual(tokens[0].value, 'foo')
-        self.assertEqual(tokens[1], Token(' '))
+        self.assertEqual(tokens[0].value, b'foo')
+        self.assertEqual(tokens[1], Token(b' '))
         self.assertEqual(tokens[2].type, 'STRING')
-        self.assertEqual(tokens[2].value, 'foo')
+        self.assertEqual(tokens[2].value, b'foo')
 
-        tokens = self.lex("`foo'`foo'")
+        tokens = self.lex(b"`foo'`foo'")
         self.assertEqual(len(tokens), 2)
         self.assertEqual(tokens[0].type, 'STRING')
-        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[0].value, b'foo')
         self.assertEqual(tokens[1].type, 'STRING')
-        self.assertEqual(tokens[1].value, 'foo')
+        self.assertEqual(tokens[1].value, b'foo')
 
     def test_nested_quotes(self):
-        tokens = self.lex("`abc `xyz' abc'")
+        tokens = self.lex(b"`abc `xyz' abc'")
         self.assertEqual(len(tokens), 1)
         self.assertEqual(tokens[0].type, 'STRING')
-        self.assertEqual(tokens[0].value, "abc `xyz' abc")
+        self.assertEqual(tokens[0].value, b"abc `xyz' abc")
 
     def test_changequote(self):
-        lex = Lexer("`abc'`abc'[xyz]`abc'")
+        lex = Lexer(b"`abc'`abc'[xyz]`abc'")
         i = lex.parse()
-        token = i.next()
+        token = next(i)
         self.assertEqual(token.type, 'STRING')
-        self.assertEqual(token.value, 'abc')
-        lex.changequote('[', ']')
+        self.assertEqual(token.value, b'abc')
+        lex.changequote(b'[', b']')
         # changing the quote characters should make the default quote
         # characters be treated as normal characters.
-        token = i.next()
-        self.assertEqual(token, Token('`'))
-        token = i.next()
+        token = next(i)
+        self.assertEqual(token, Token(b'`'))
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'abc')
-        token = i.next()
-        self.assertEqual(token, Token('\''))
+        self.assertEqual(token.value, b'abc')
+        token = next(i)
+        self.assertEqual(token, Token(b'\''))
         # ...and the new quote characters should work
-        token = i.next()
+        token = next(i)
         self.assertEqual(token.type, 'STRING')
-        self.assertEqual(token.value, 'xyz')
+        self.assertEqual(token.value, b'xyz')
         # check that the defaults work
         lex.changequote()
-        token = i.next()
+        token = next(i)
         self.assertEqual(token.type, 'STRING')
-        self.assertEqual(token.value, 'abc')
+        self.assertEqual(token.value, b'abc')
 
     def test_comments(self):
-        tokens = self.lex("# foo")
+        tokens = self.lex(b"# foo")
         self.assertEqual(len(tokens), 1)
         self.assertEqual(tokens[0].type, 'COMMENT')
-        self.assertEqual(tokens[0].value, '# foo')
+        self.assertEqual(tokens[0].value, b'# foo')
 
-        tokens = self.lex("foo # foo")
+        tokens = self.lex(b"foo # foo")
         self.assertEqual(len(tokens), 3)
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
-        self.assertEqual(tokens[0].value, 'foo')
-        self.assertEqual(tokens[1], Token(' '))
+        self.assertEqual(tokens[0].value, b'foo')
+        self.assertEqual(tokens[1], Token(b' '))
         self.assertEqual(tokens[2].type, 'COMMENT')
-        self.assertEqual(tokens[2].value, '# foo')
+        self.assertEqual(tokens[2].value, b'# foo')
 
-        tokens = self.lex("foo#foo")
+        tokens = self.lex(b"foo#foo")
         self.assertEqual(len(tokens), 2)
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
-        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[0].value, b'foo')
         self.assertEqual(tokens[1].type, 'COMMENT')
-        self.assertEqual(tokens[1].value, '#foo')
+        self.assertEqual(tokens[1].value, b'#foo')
 
-        tokens = self.lex("foo#foo\nfoo")
+        tokens = self.lex(b"foo#foo\nfoo")
         self.assertEqual(len(tokens), 4)
         self.assertEqual(tokens[0].type, 'IDENTIFIER')
-        self.assertEqual(tokens[0].value, 'foo')
+        self.assertEqual(tokens[0].value, b'foo')
         self.assertEqual(tokens[1].type, 'COMMENT')
-        self.assertEqual(tokens[1].value, '#foo')
-        self.assertEqual(tokens[2], Token('\n'))
+        self.assertEqual(tokens[1].value, b'#foo')
+        self.assertEqual(tokens[2], Token(b'\n'))
         self.assertEqual(tokens[3].type, 'IDENTIFIER')
-        self.assertEqual(tokens[3].value, 'foo')
+        self.assertEqual(tokens[3].value, b'foo')
 
     def test_insert(self):
-        lex = Lexer('abc xyz')
+        lex = Lexer(b'abc xyz')
         i = lex.parse()
-        token = i.next()
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'abc')
-        lex.insert_text('foo')
-        token = i.next()
+        self.assertEqual(token.value, b'abc')
+        lex.insert_text(b'foo')
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'foo')
-        token = i.next()
-        self.assertEqual(token, Token(' '))
-        token = i.next()
+        self.assertEqual(token.value, b'foo')
+        token = next(i)
+        self.assertEqual(token, Token(b' '))
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'xyz')
+        self.assertEqual(token.value, b'xyz')
 
     def test_insert_eof(self):
-        lex = Lexer('abc')
+        lex = Lexer(b'abc')
         i = lex.parse()
-        token = i.next()
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'abc')
-        lex.insert_text('foo')
-        token = i.next()
+        self.assertEqual(token.value, b'abc')
+        lex.insert_text(b'foo')
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'foo')
+        self.assertEqual(token.value, b'foo')
 
     def test_peek_char(self):
-        lex = Lexer('abc xyz')
+        lex = Lexer(b'abc xyz')
         i = lex.parse()
-        self.assertEqual(i.peek_char(), 'a')
-        token = i.next()
+        self.assertEqual(i.peek_char(), ord('a'))
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'abc')
-        self.assertEqual(i.peek_char(), ' ')
-        token = i.next()
-        self.assertEqual(token, Token(' '))
-        self.assertEqual(i.peek_char(), 'x')
-        token = i.next()
+        self.assertEqual(token.value, b'abc')
+        self.assertEqual(i.peek_char(), ord(' '))
+        token = next(i)
+        self.assertEqual(token, Token(b' '))
+        self.assertEqual(i.peek_char(), ord('x'))
+        token = next(i)
         self.assertEqual(token.type, 'IDENTIFIER')
-        self.assertEqual(token.value, 'xyz')
+        self.assertEqual(token.value, b'xyz')
         self.assertIs(i.peek_char(), EOF)
 
 
 class ParserTests(unittest.TestCase):
     def parse(self, parser):
-        stream = StringIO()
+        stream = BytesIO()
         parser.parse(stream=stream)
         return stream.getvalue()
 
     def test_basic(self):
-        p = Parser('abc')
-        self.assertEqual(self.parse(p), 'abc')
+        p = Parser(b'abc')
+        self.assertEqual(self.parse(p), b'abc')
 
     def test_empty_string(self):
-        p = Parser("`'")
-        self.assertEqual(self.parse(p), '')
+        p = Parser(b"`'")
+        self.assertEqual(self.parse(p), b'')
 
     def test_define_empty(self):
-        p = Parser('abc')
-        p.define('abc')
-        self.assertEqual(self.parse(p), '')
+        p = Parser(b'abc')
+        p.define(b'abc')
+        self.assertEqual(self.parse(p), b'')
 
     def test_define_simple(self):
-        p = Parser('abc')
-        p.define('abc', 'xyz')
-        self.assertEqual(self.parse(p), 'xyz')
+        p = Parser(b'abc')
+        p.define(b'abc', b'xyz')
+        self.assertEqual(self.parse(p), b'xyz')
 
     def test_define_simple_trailing(self):
-        p = Parser('abc ')
-        p.define('abc', 'xyz')
-        self.assertEqual(self.parse(p), 'xyz ')
+        p = Parser(b'abc ')
+        p.define(b'abc', b'xyz')
+        self.assertEqual(self.parse(p), b'xyz ')
 
     def test_define_recursive(self):
-        p = Parser('abc')
-        p.define('abc', 'xyz')
-        p.define('xyz', '123')
-        self.assertEqual(self.parse(p), '123')
+        p = Parser(b'abc')
+        p.define(b'abc', b'xyz')
+        p.define(b'xyz', b'123')
+        self.assertEqual(self.parse(p), b'123')
 
     def test_define_argparse(self):
-        p = Parser('define( abc, xyz)abc')
-        self.assertEqual(self.parse(p), 'xyz')
+        p = Parser(b'define( abc, xyz)abc')
+        self.assertEqual(self.parse(p), b'xyz')
 
     def test_changequote(self):
-        p = Parser("`abc'[xyz]")
-        p.changequote('[', ']')
-        self.assertEqual(self.parse(p), "`abc'xyz")
+        p = Parser(b"`abc'[xyz]")
+        p.changequote(b'[', b']')
+        self.assertEqual(self.parse(p), b"`abc'xyz")
 
     def test_macro_args_nested_parens(self):
-        p = Parser('foo(abc(xyz)abc)')
-        p.define('foo', 'bar')
-        self.assertEqual(self.parse(p), 'bar')
+        p = Parser(b'foo(abc(xyz)abc)')
+        p.define(b'foo', b'bar')
+        self.assertEqual(self.parse(p), b'bar')
 
 
 class ComparisonTests(unittest.TestCase):
     def check_file(self, input_file, expected_file, thing):
-        expected = open(expected_file, 'r').read()
+        with open(expected_file, 'rb') as f:
+            expected = f.read()
         if thing == 'm4':
             # check m4 output
             m4_output = subprocess.check_output(['m4', input_file])
             self.assertEqual(m4_output, expected)
         elif thing == 'parser':
-            stream = StringIO()
-            Parser(open(input_file, 'r').read()).parse(stream=stream)
-            self.assertEqual(stream.getvalue(), expected)
+            stream = BytesIO()
+            with open(input_file, 'rb') as f:
+                Parser(f.read()).parse(stream=stream)
+                self.assertEqual(stream.getvalue(), expected)
 
 
 def create_test(input_file, output_file, thing):
-    first_line = open(input_file, 'r').readline()
+    with open(input_file, 'rb') as f:
+        first_line = f.readline()
     def do_test(self):
         self.check_file(input_file, output_file, thing)
-    if first_line.startswith('dnl fail') and thing == 'parser':
+    if first_line.startswith(b'dnl fail') and thing == 'parser':
         return unittest.expectedFailure(do_test)
     return do_test
 

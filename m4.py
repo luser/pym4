@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import itertools
 import sys
+from typing import Iterator, Optional, Union
 
 from collections import defaultdict
 
@@ -15,7 +15,7 @@ class ParseError(Exception):
 
 
 class Token(object):
-    def __init__(self, name, value=None):
+    def __init__(self, name: bytes, value: Optional[bytes] = None):
         self.type = name
         self.value = name if value is None else value
 
@@ -47,30 +47,30 @@ def name(x):
 class peek_insert_iter:
     def __init__(self, iter):
         self.iter = iter
-        self.inserted = []
-        self.peeked = []
+        self.inserted = bytearray()
+        self.peeked = bytearray()
 
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         if self.inserted:
             return self.inserted.pop(0)
         if self.peeked:
             return self.peeked.pop(0)
-        return self.iter.next()
+        return next(self.iter)
 
-    def insert(self, iterable):
+    def insert(self, iterable: Union[bytes, eof]):
         self.inserted[0:0] = iterable
 
     def _peek(self):
         if not self.peeked:
             try:
-                self.peeked.append(self.iter.next())
+                self.peeked.append(next(self.iter))
             except StopIteration:
                 pass
 
-    def peek(self):
+    def peek(self) -> Union[int, eof]:
         if self.inserted:
             return self.inserted[0]
         self._peek()
@@ -83,23 +83,23 @@ class Lexer:
     def __init__(self, text):
         self.text = text
         self.state = None
-        self.chars = []
+        self.chars = bytearray()
         self.nesting_level = 0
-        self.start_quote = ['`']
-        self.end_quote = ["'"]
+        self.start_quote = b'`'
+        self.end_quote = b"'"
         self.iter = None
 
     def _finish_token(self, name):
-        t = Token(name, ''.join(self.chars))
-        self.chars = []
+        t = Token(name, bytes(self.chars))
+        self.chars = bytearray()
         return t
 
     def insert_text(self, text):
         self.iter.insert(text)
 
-    def changequote(self, start_quote='`', end_quote='\''):
-        self.start_quote = [start_quote]
-        self.end_quote = [end_quote]
+    def changequote(self, start_quote=b'`', end_quote=b'\''):
+        self.start_quote = start_quote
+        self.end_quote = end_quote
 
     def parse(self):
         '''
@@ -113,18 +113,18 @@ class Lexer:
             def __init__(self, iter):
                 self.iter = iter
 
-            def __iter__(self):
+            def __iter__(self) -> Token:
                 return self.iter
 
-            def next(self):
-                return self.iter.next()
+            def __next__(self) -> Token:
+                return next(self.iter)
 
-            def peek_char(self):
+            def peek_char(self) -> int:
                 return lexer.iter.peek()
         self.iter = peek_insert_iter(iter(self.text))
         return peekthrough_iter(self._parse_internal())
 
-    def _parse_internal(self):
+    def _parse_internal(self) -> Iterator[Token]:
         while True:
             c = self.iter.peek()
             #print 'CHAR: %s (state: %s)' % (repr(c), name(self.state))
@@ -139,29 +139,29 @@ class Lexer:
         if self.chars:
             if self.state is None:
                 for c in self.chars:
-                    yield Token(c, c)
+                    yield Token(bytes([c]), bytes([c]))
             else:
                 raise ParseError('Error, unterminated %s' % name(self.state))
 
     def _generic(self, c):
         if c is not EOF:
-            self.chars.append(self.iter.next())
-        if c.isalpha() or c == '_':
-            self.state = self._identifier
-        elif c == '#':
-            self.state = self._comment
+            self.chars.append(next(self.iter))
+            if bytearray([c]).isalpha() or c == ord('_'):
+                self.state = self._identifier
+            elif c == ord('#'):
+                self.state = self._comment
         # TODO: handle multi-character quotes
         if self.chars == self.start_quote:
             self.state = self._string
             self.nesting_level = 1
         if self.state is None:
-            tokens = [Token(c, c) for c in self.chars]
-            self.chars = []
+            tokens = [Token(bytes([c]), bytes([c])) for c in self.chars]
+            self.chars = bytearray()
             return tokens
         return []
 
     def _string(self, c):
-        self.chars.append(self.iter.next())
+        self.chars.append(next(self.iter))
         if (
                 self.start_quote != self.end_quote and
                 endswith(self.chars, self.start_quote)
@@ -178,16 +178,16 @@ class Lexer:
         return []
 
     def _identifier(self, c):
-        if not (c.isalnum() or c == '_'):
+        if c is EOF or not (bytearray([c]).isalnum() or c == ord('_')):
             self.state = None
             return [self._finish_token('IDENTIFIER')]
 
-        self.chars.append(self.iter.next())
+        self.chars.append(next(self.iter))
         return []
 
     def _comment(self, c):
-        if c != '\n' and c is not EOF:
-            self.chars.append(self.iter.next())
+        if c != ord('\n') and c is not EOF:
+            self.chars.append(next(self.iter))
             return []
 
         self.state = None
@@ -202,10 +202,10 @@ def substmacro(name, body, args):
 class Parser:
     def __init__(self, text):
         self.macros = {
-            'define': self._builtin_define,
-            'dnl': self._builtin_dnl,
-            'changequote': self._builtin_changequote,
-            'divert': self._builtin_divert,
+            b'define': self._builtin_define,
+            b'dnl': self._builtin_dnl,
+            b'changequote': self._builtin_changequote,
+            b'divert': self._builtin_divert,
         }
         self.lexer = Lexer(text)
         self.token_iter = self.lexer.parse()
@@ -220,7 +220,7 @@ class Parser:
     def _builtin_dnl(self, args):
         # Eat tokens till newline
         for tok in self.token_iter:
-            if tok.value == '\n':
+            if tok.value == b'\n':
                 break
         return None
 
@@ -241,22 +241,22 @@ class Parser:
     def _parse_args(self):
         args = []
         current_arg = []
-        if self.token_iter.peek_char() == '(':
+        if self.token_iter.peek_char() == ord('('):
             # drop that token
-            tok = self.token_iter.next()
-            if tok.value != '(':
+            tok = next(self.token_iter)
+            if tok.value != b'(':
                 raise ParseError('Expected open parenthesis but got %s'
                                  % tok.value)
             nesting_level = 1
             for tok in self._expand_tokens():
-                if tok.value == '(':
+                if tok.value == b'(':
                     nesting_level += 1
-                elif tok.value == ',' or tok.value == ')':
-                    args.append(''.join(current_arg))
+                elif tok.value == b',' or tok.value == b')':
+                    args.append(b''.join(current_arg))
                     current_arg = []
                 elif current_arg or not tok.value.isspace():
                     current_arg.append(tok.value)
-                if tok.value == ')':
+                if tok.value == b')':
                     nesting_level -= 1
                     if nesting_level == 0:
                         break
@@ -276,13 +276,13 @@ class Parser:
             else:
                 yield tok
 
-    def define(self, name, body=''):
+    def define(self, name, body=b''):
         self.macros[name] = lambda x: substmacro(name, body, x)
 
-    def changequote(self, start_quote='`', end_quote='\''):
+    def changequote(self, start_quote=b'`', end_quote=b'\''):
         self.lexer.changequote(start_quote, end_quote)
 
-    def parse(self, stream=sys.stdout):
+    def parse(self, stream=sys.stdout.buffer):
         for tok in self._expand_tokens():
             if self.current_diversion == 0:
                 stream.write(tok.value)
@@ -291,9 +291,9 @@ class Parser:
         for diversion in sorted(self.diversions.keys()):
             if diversion < 1:
                 continue
-            stream.write(''.join(self.diversions[diversion]))
+            stream.write(b''.join(self.diversions[diversion]))
             self.diversions[diversion] = []
 
 
 if __name__ == '__main__':
-    Parser(sys.stdin.read()).parse()
+    Parser(sys.stdin.buffer.read()).parse()
