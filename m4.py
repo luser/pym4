@@ -36,10 +36,6 @@ class eof(str):
 EOF = eof()
 
 
-def endswith(l, e):
-    return l[-len(e):] == e
-
-
 def name(x):
     return x.__name__ if hasattr(x, '__name__') else x
 
@@ -164,10 +160,10 @@ class Lexer:
         self.chars.append(next(self.iter))
         if (
                 self.start_quote != self.end_quote and
-                endswith(self.chars, self.start_quote)
+                self.chars.endswith(self.start_quote)
         ):
             self.nesting_level += 1
-        elif endswith(self.chars, self.end_quote):
+        elif self.chars.endswith(self.end_quote):
             self.nesting_level -= 1
             if self.nesting_level == 0:
                 # strip start/end quote out of the token value
