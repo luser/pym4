@@ -6,6 +6,9 @@ from typing import Iterator, Optional, Union
 from collections import defaultdict
 
 
+__version__ = (0, 0, 1)
+
+
 class ParseError(Exception):
     def __init__(self, message):
         self.message = message
