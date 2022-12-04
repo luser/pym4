@@ -294,5 +294,4 @@ class Parser:
             self.diversions[diversion] = []
 
 
-if __name__ == '__main__':
-    Parser(sys.stdin.buffer.read()).parse()
+
